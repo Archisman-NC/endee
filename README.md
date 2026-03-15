@@ -93,7 +93,7 @@ pip install -r requirements.txt
 # Optional: ENDEE_BASE_URL=http://localhost:8080/api/v1
 
 # Run the Chat UI
-streamlit run frontend/app.py
+streamlit run repomind/frontend/app.py
 ```
 
 ## Use Cases

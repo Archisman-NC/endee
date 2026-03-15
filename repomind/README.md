@@ -211,7 +211,7 @@ ENDEE_BASE_URL=http://localhost:8080/api/v1
 ### 4. Launch the App
 
 ```bash
-streamlit run frontend/app.py
+streamlit run repomind/frontend/app.py
 ```
 
 Open [http://localhost:8501](http://localhost:8501) in your browser.
@@ -248,25 +248,26 @@ After indexing a repository (e.g. `https://github.com/pallets/flask`), try:
 
 ```
 endee/
-├── ingestion/
-│   ├── github_loader.py     # Clone repos with GitPython
-│   └── code_chunker.py      # Language-aware code splitting
-├── rag/
-│   ├── embeddings.py        # Sentence-transformer embedding generation
-│   ├── vector_store.py      # Endee DB client — store & search
-│   ├── retriever.py         # Query → embed → vector search pipeline
-│   └── generator.py         # LangChain LLM answer generation
-├── frontend/
-│   └── app.py               # Streamlit chat UI
-├── tests/
-│   ├── test_clone.py
-│   ├── test_chunking.py
-│   ├── test_embeddings.py
-│   ├── test_vector_store.py
-│   ├── test_retrieval.py
-│   └── test_generation.py
-├── requirements.txt
-└── .env                     # (not committed)
+└── repomind/
+    ├── ingestion/
+    │   ├── github_loader.py     # Clone repos with GitPython
+    │   └── code_chunker.py      # Language-aware code splitting
+    ├── rag/
+    │   ├── embeddings.py        # Sentence-transformer embedding generation
+    │   ├── vector_store.py      # Endee DB client — store & search
+    │   ├── retriever.py         # Query → embed → vector search pipeline
+    │   └── generator.py         # LangChain LLM answer generation
+    ├── frontend/
+    │   └── app.py               # Streamlit chat UI
+    ├── tests/
+    │   ├── test_clone.py
+    │   ├── test_chunking.py
+    │   ├── test_embeddings.py
+    │   ├── test_vector_store.py
+    │   ├── test_retrieval.py
+    │   └── test_generation.py
+    ├── requirements.txt
+    └── .env                     # (not committed)
 ```
 
 ---
