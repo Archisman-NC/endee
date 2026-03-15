@@ -5,6 +5,7 @@ sentence-transformers
 langchain
 langchain-text-splitters
 langchain-openai
+langchain-groq
 GitPython
 python-dotenv
 endee
