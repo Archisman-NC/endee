@@ -4,6 +4,7 @@ streamlit
 sentence-transformers
 langchain
 langchain-text-splitters
+langchain-openai
 GitPython
 python-dotenv
 endee
