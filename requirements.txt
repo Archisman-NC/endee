@@ -3,5 +3,7 @@ uvicorn
 streamlit
 sentence-transformers
 langchain
+langchain-text-splitters
 GitPython
 python-dotenv
+endee
