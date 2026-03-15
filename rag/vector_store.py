@@ -126,12 +126,16 @@ def search_similar(
 
     results = []
     for item in raw_results:
-        meta = item.meta if hasattr(item, "meta") and item.meta else {}
+        # Handle results as dictionaries (default for Endee Python SDK)
+        meta = item.get("meta", {}) if isinstance(item, dict) else getattr(item, "meta", {})
+        item_id = item.get("id") if isinstance(item, dict) else getattr(item, "id", None)
+        similarity = item.get("similarity") if isinstance(item, dict) else getattr(item, "similarity", None)
+        
         results.append({
-            "chunk_id": meta.get("chunk_id", item.id),
+            "chunk_id": meta.get("chunk_id", item_id),
             "file_path": meta.get("file_path", ""),
             "content": meta.get("content", ""),
-            "similarity": item.similarity if hasattr(item, "similarity") else None,
+            "similarity": similarity,
         })
 
     logger.info(f"Found {len(results)} results.")
