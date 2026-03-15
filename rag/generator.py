@@ -65,8 +65,13 @@ def generate_answer(
     user_prompt = _build_prompt(query, retrieved_chunks)
 
     # Initialize LLM via LangChain (model configured via env var)
-    model_name = os.getenv("LLM_MODEL", "gpt-4o-mini")
-    provider = os.getenv("LLM_PROVIDER", "openai")
+    try:
+        import streamlit as st
+        model_name = st.secrets.get("LLM_MODEL", os.getenv("LLM_MODEL", "gpt-4o-mini"))
+        provider = st.secrets.get("LLM_PROVIDER", os.getenv("LLM_PROVIDER", "openai"))
+    except Exception:
+        model_name = os.getenv("LLM_MODEL", "gpt-4o-mini")
+        provider = os.getenv("LLM_PROVIDER", "openai")
 
     logger.info(f"Calling LLM ({provider}/{model_name}) for query: '{query}'")
 

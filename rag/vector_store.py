@@ -21,13 +21,21 @@ def _get_client() -> Endee:
     """Lazily creates and caches the Endee client."""
     global _client
     if _client is None:
-        base_url = os.getenv("ENDEE_BASE_URL", "http://localhost:8080/api/v1")
-        auth_token = os.getenv("ENDEE_AUTH_TOKEN", "")
+        # Prefer st.secrets if running in Streamlit Cloud, fallback to os.getenv
+        try:
+            import streamlit as st
+            base_url = st.secrets.get("ENDEE_BASE_URL", os.getenv("ENDEE_BASE_URL", "http://localhost:8080/api/v1"))
+            auth_token = st.secrets.get("ENDEE_AUTH_TOKEN", os.getenv("ENDEE_AUTH_TOKEN", ""))
+        except Exception:
+            base_url = os.getenv("ENDEE_BASE_URL", "http://localhost:8080/api/v1")
+            auth_token = os.getenv("ENDEE_AUTH_TOKEN", "")
+
         _client = Endee()
         if auth_token:
             _client.set_auth_token(auth_token)
-        if base_url != "http://localhost:8080/api/v1":
-            _client.set_base_url(base_url)
+        
+        # Always set base URL to avoid ambiguity with defaults
+        _client.set_base_url(base_url)
         logger.info(f"Endee client initialized → {base_url}")
     return _client
 
