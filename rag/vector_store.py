@@ -23,7 +23,9 @@ def _get_client() -> Endee:
     if _client is None:
         base_url = os.getenv("ENDEE_BASE_URL", "http://localhost:8080/api/v1")
         auth_token = os.getenv("ENDEE_AUTH_TOKEN", "")
-        _client = Endee(auth_token=auth_token if auth_token else None)
+        _client = Endee()
+        if auth_token:
+            _client.set_auth_token(auth_token)
         if base_url != "http://localhost:8080/api/v1":
             _client.set_base_url(base_url)
         logger.info(f"Endee client initialized → {base_url}")
