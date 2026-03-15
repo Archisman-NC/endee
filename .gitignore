@@ -29,3 +29,18 @@ frontend/__pycache__/
 
 # DS Store
 .DS_Store
+
+# Environment variables — never commit secrets
+.env
+
+# Endee Data (Local database files)
+endee-data/
+
+# Python Cache
+__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
