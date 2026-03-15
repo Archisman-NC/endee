@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+streamlit
+sentence-transformers
+langchain
+GitPython
+python-dotenv
