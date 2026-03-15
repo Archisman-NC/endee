@@ -58,19 +58,17 @@ def _get_index():
     return _index
 
 
-def store_embeddings(vectors: List[Dict[str, Any]]) -> int:
+def store_embeddings(vectors: List[Dict[str, Any]], batch_size: int = 500) -> int:
     """
-    Upserts a list of embedding vectors with metadata into the Endee index.
+    Upserts a list of embedding vectors with metadata into the Endee index in batches.
 
     Args:
         vectors (List[Dict[str, Any]]): Output from `generate_embeddings()`.
             Each item must contain 'chunk_id', 'embedding', 'file_path', and 'content'.
+        batch_size (int): Max number of vectors to send in a single batch. Endee limit is 1000.
 
     Returns:
         int: Number of vectors stored.
-
-    Raises:
-        Exception: If the upsert operation fails.
     """
     if not vectors:
         logger.warning("No vectors provided to store_embeddings.")
@@ -91,10 +89,16 @@ def store_embeddings(vectors: List[Dict[str, Any]]) -> int:
         for v in vectors
     ]
 
-    logger.info(f"Storing {len(items)} vectors in index '{INDEX_NAME}'...")
-    index.upsert(items)
-    logger.info(f"Successfully stored {len(items)} vectors.")
-    return len(items)
+    total_stored = 0
+    logger.info(f"Storing {len(items)} vectors in batches of {batch_size}...")
+    
+    for i in range(0, len(items), batch_size):
+        batch = items[i : i + batch_size]
+        index.upsert(batch)
+        total_stored += len(batch)
+        logger.info(f"  Batch {i//batch_size + 1}: Stored {total_stored}/{len(items)} vectors")
+
+    return total_stored
 
 
 def search_similar(
