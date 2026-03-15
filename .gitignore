@@ -24,9 +24,8 @@ data/*
 .vscode/
 .vscode/*
 
-# Frontend
-frontend/
-frontend/*
+# Exclude frontend cache only
+frontend/__pycache__/
 
 # DS Store
 .DS_Store
