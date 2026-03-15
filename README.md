@@ -57,6 +57,45 @@ The server listens on port `8080`. For detailed setup paths, supported operating
 - [Getting Started](./docs/getting-started.md)
 - [Hosted Quick Start Docs](https://docs.endee.io/quick-start)
 
+### Demo: RepoMind (AI Code Assistant)
+
+**RepoMind** is a showcase application built on top of Endee. It allows you to point at any GitHub repository and start a semantic chat with its codebase.
+
+- **Fast Retrieval**: Powered by Endee's sub-millisecond vector search.
+- **Smart Chunking**: Language-aware code splitting for better context.
+- **LLM Grounding**: Accurate answers citations from actual source files.
+
+[**Explore RepoMind →**](./repomind/README.md)
+
+## Quick Start (Local Setup)
+
+### 1. Start Endee Vector Database
+Endee runs as a high-performance server.
+
+```bash
+# Fastest path via Docker
+docker run -p 8080:8080 -v ./endee-data:/data endeeio/endee-server:latest
+```
+
+### 2. Setup the Python RAG Application (RepoMind)
+RepoMind provides the chat interface and indexing pipeline.
+
+```bash
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment (create .env)
+# Required: GROQ_API_KEY (or OPENAI_API_KEY)
+# Optional: ENDEE_BASE_URL=http://localhost:8080/api/v1
+
+# Run the Chat UI
+streamlit run frontend/app.py
+```
+
 ## Use Cases
 
 ### RAG and AI Retrieval

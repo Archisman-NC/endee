@@ -170,51 +170,63 @@ git clone https://github.com/Archisman-NC/endee.git
 cd endee
 ```
 
-### 2. Start Endee vector database
+### 1. Start Endee Vector Database
 
 ```bash
 # Option A: Docker Hub (fastest)
 docker run --ulimit nofile=100000:100000 \
   -p 8080:8080 -v ./endee-data:/data \
   --name endee-server endeeio/endee-server:latest
-
-# Option B: Build from source + Docker Compose (Apple Silicon)
-docker build --build-arg BUILD_ARCH=neon -t endee-oss:latest -f ./infra/Dockerfile .
-docker compose up -d
 ```
 
-### 3. Create a Python virtual environment
+### 2. Setup Python Virtual Environment
 
 ```bash
+# In the project root
 python3 -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment variables
+### 3. Configure Environment Variables
 
 Create a `.env` file in the project root:
 
 ```env
-# LLM (required)
-OPENAI_API_KEY=sk-...
+# LLM Provider (Groq is recommended for speed)
+GROQ_API_KEY=gsk_...
+LLM_PROVIDER=groq
+LLM_MODEL=llama-3.3-70b-versatile
 
-# Optional — LangChain model config
-LLM_MODEL=gpt-4o-mini
-LLM_PROVIDER=openai
+# Alternatively, use OpenAI
+# OPENAI_API_KEY=sk-...
+# LLM_PROVIDER=openai
 
-# Optional — Endee connection
+# Endee Connection
+# Local: http://localhost:8080/api/v1
+# Cloud: Use your Ngrok public URL
 ENDEE_BASE_URL=http://localhost:8080/api/v1
-ENDEE_AUTH_TOKEN=
 ```
 
-### 5. Launch the app
+### 4. Launch the App
 
 ```bash
 streamlit run frontend/app.py
 ```
 
 Open [http://localhost:8501](http://localhost:8501) in your browser.
+
+---
+
+## Cloud Deployment (Streamlit Cloud)
+
+If deploying to Streamlit Cloud, you must expose your local Endee instance via a tunnel.
+
+1. **Install Ngrok**: `brew install ngrok`
+2. **Start Tunnel**: `ngrok http 8080`
+3. **Set Secrets**: In Streamlit Cloud Settings > Secrets, add:
+   - `GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL`
+   - `ENDEE_BASE_URL` = `"https://<your-ngrok-id>.ngrok-free.app/api/v1"`
 
 ---
 
