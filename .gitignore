@@ -44,3 +44,22 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Virtual Environment
+venv/
+env/
+.env/
+node_modules/
+
+# Build and Distribution
+dist/
+build/
+*.egg-info/
+bin/
+lib/
+include/
+
+# IDEs and Editors
+.idea/
+*.swp
+*.swo
