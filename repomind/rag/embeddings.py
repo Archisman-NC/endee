@@ -57,12 +57,10 @@ def generate_embeddings(
 
     results = []
     for chunk, vector in zip(chunks, vectors):
-        results.append({
-            "content": chunk["content"],
-            "file_path": chunk["file_path"],
-            "chunk_id": chunk["chunk_id"],
-            "embedding": vector.tolist(),
-        })
+        # Preserve all original keys and add the embedding
+        new_chunk = chunk.copy()
+        new_chunk["embedding"] = vector.tolist()
+        results.append(new_chunk)
 
-    logger.info(f"Embeddings generated. Dimension: {len(results[0]['embedding']) if results else 'N/A'}")
+    logger.info(f"Embeddings generated for {len(results)} chunks.")
     return results
