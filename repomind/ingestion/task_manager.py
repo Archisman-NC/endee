@@ -8,14 +8,17 @@ logger = logging.getLogger(__name__)
 
 import os
 
-# Redis Connection for task mapping (Phase 5)
-redis_host = os.getenv("REDIS_HOST", "localhost")
-redis_port = int(os.getenv("REDIS_PORT", "6379"))
-
 try:
-    _redis_client = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)
+    _redis_client = redis.Redis(
+        host=redis_host, 
+        port=redis_port, 
+        db=0, 
+        decode_responses=True,
+        socket_connect_timeout=2 # Fast fail for cloud
+    )
+    _redis_client.ping() # Force real connection check
 except Exception as e:
-    logger.error(f"[RepoMind] Could not connect to Redis: {e}")
+    logger.warning(f"[RepoMind] Redis not available (Standalone Mode enabled): {e}")
     _redis_client = None
 
 # Thread-safe local task registry (for backwards compatibility/fallback)
@@ -59,11 +62,12 @@ def get_task(repo_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves the current state of a task, prioritizing Celery/Redis (Phase 5)."""
     # 1. Check Redis for Celery Task ID
     if _redis_client:
-        task_id = _redis_client.get(f"task_id:{repo_id}")
-        if task_id:
-            from celery.result import AsyncResult
-            from celery_app import celery_app
-            res = AsyncResult(task_id, app=celery_app)
+        try:
+            task_id = _redis_client.get(f"task_id:{repo_id}")
+            if task_id:
+                from celery.result import AsyncResult
+                from celery_app import celery_app
+                res = AsyncResult(task_id, app=celery_app)
             
             # Construct task state from Celery/Redis
             state = {
@@ -83,15 +87,17 @@ def get_task(repo_id: str) -> Optional[Dict[str, Any]]:
             elif isinstance(res.info, Exception):
                 state["error"] = str(res.info)
             
-            if res.state == "SUCCESS":
-                state["status"] = "completed"
-                state["progress"] = 100
-                state["message"] = "Indexing completed!"
-            elif res.state == "FAILURE":
-                state["status"] = "failed"
-                state["error"] = str(res.result)
-                
-            return state
+                if res.state == "SUCCESS":
+                    state["status"] = "completed"
+                    state["progress"] = 100
+                    state["message"] = "Indexing completed!"
+                elif res.state == "FAILURE":
+                    state["status"] = "failed"
+                    state["error"] = str(res.result)
+                    
+                return state
+        except Exception as e:
+            logger.warning(f"[RepoMind] Redis lookup failed, falling back to local: {e}")
 
     # 2. Fallback to local _tasks dict
     with _task_lock:
