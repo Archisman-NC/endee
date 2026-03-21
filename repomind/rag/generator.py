@@ -38,20 +38,19 @@ def _build_prompt(query: str, retrieved_chunks: List[Dict[str, Any]]) -> str:
 def generate_answer(
     query: str,
     retrieved_chunks: List[Dict[str, Any]],
+    streaming_placeholder=None
 ) -> Dict[str, Any]:
     """
     Generates a natural language explanation for a query using an LLM and retrieved code context.
+    Supports real-time token streaming to an optional Streamlit placeholder.
 
     Args:
         query (str): The natural language question about the codebase.
-        retrieved_chunks (List[Dict[str, Any]]): Code chunks from the retriever,
-            each with 'content', 'file_path', 'chunk_id', and 'similarity'.
+        retrieved_chunks (List[Dict[str, Any]]): Code chunks from the retriever.
+        streaming_placeholder (st.empty, optional): Placeholder for live streaming.
 
     Returns:
-        Dict[str, Any]: A dict containing:
-            - 'answer'       : LLM-generated explanation (str)
-            - 'source_files' : Deduplicated list of source file paths (List[str])
-            - 'query'        : The original query (str)
+        Dict[str, Any]: Generated answer and metadata.
     """
     if not query or not query.strip():
         return {"answer": "Please provide a valid query.", "source_files": [], "query": query}
@@ -65,6 +64,9 @@ def generate_answer(
     user_prompt = _build_prompt(query, retrieved_chunks)
 
     # Initialize LLM via LangChain (model configured via env var)
+    from rag.stream_handler import StreamHandler
+    stream_handler = StreamHandler(streaming_placeholder)
+
     try:
         import streamlit as st
         model_name = st.secrets.get("LLM_MODEL", os.getenv("LLM_MODEL", "gpt-4o-mini"))
@@ -73,20 +75,45 @@ def generate_answer(
         model_name = os.getenv("LLM_MODEL", "gpt-4o-mini")
         provider = os.getenv("LLM_PROVIDER", "openai")
 
-    logger.info(f"Calling LLM ({provider}/{model_name}) for query: '{query}'")
+    logger.info(f"Calling LLM ({provider}/{model_name}) for query: '{query}' [Streaming=True]")
+    print("[RepoMind] Streaming started...")
 
     try:
-        llm = init_chat_model(model_name, model_provider=provider)
+        llm = init_chat_model(
+            model_name, 
+            model_provider=provider, 
+            streaming=True, 
+            callbacks=[stream_handler]
+        )
         messages = [
             SystemMessage(content=SYSTEM_PROMPT),
             HumanMessage(content=user_prompt),
         ]
         response = llm.invoke(messages)
-        answer = response.content
+        
+        # Captured tokens vs invoke() result
+        answer = stream_handler.get_response()
+        if not answer:
+            answer = response.content
+            
+        # Remove cursor effect if placeholder exists
+        if streaming_placeholder:
+            streaming_placeholder.markdown(
+                f'<div class="msg-assistant">🤖 {answer}</div>', 
+                unsafe_allow_html=True
+            )
+            
+        print(f"[RepoMind] Tokens received: {len(stream_handler.tokens)}")
+        print("[RepoMind] Streaming completed.")
 
     except Exception as e:
         logger.error(f"LLM call failed: {e}")
         answer = f"[LLM Error] Could not generate answer: {e}"
+        if streaming_placeholder:
+            streaming_placeholder.markdown(
+                f'<div class="msg-assistant">🤖 ⚠️ **Error generating response:** {str(e)}</div>', 
+                unsafe_allow_html=True
+            )
 
     return {
         "answer": answer,

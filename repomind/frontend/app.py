@@ -94,6 +94,8 @@ if "indexed_repo" not in st.session_state:
     st.session_state.indexed_repo = None
 if "chunk_count" not in st.session_state:
     st.session_state.chunk_count = 0
+if "is_streaming" not in st.session_state:
+    st.session_state.is_streaming = False
 
 # ── Sidebar — Repository Indexer ─────────────────────────────────────────────
 with st.sidebar:
@@ -208,31 +210,42 @@ for msg in st.session_state.messages:
 if not st.session_state.indexed_repo:
     st.info("👈 Index a repository from the sidebar to start chatting.")
 else:
-    query = st.chat_input("Ask anything about this codebase…")
+    # Phase 5: Disable input while streaming
+    query = st.chat_input(
+        "Ask anything about this codebase…", 
+        disabled=st.session_state.is_streaming
+    )
+    
     if query:
-        # Store user message
+        # 1. Update state and prevent overlaps
+        st.session_state.is_streaming = True
         st.session_state.messages.append({"role": "user", "content": query})
-        st.markdown(f'<div class="msg-user">💬 {query}</div>', unsafe_allow_html=True)
-
-        with st.spinner("Searching codebase…"):
-            chunks = retrieve_relevant_chunks(query, top_k=5)
-
-        with st.spinner("Generating answer…"):
-            result = generate_answer(query, chunks)
-
-        # Store and display assistant message
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": result["answer"],
-            "source_files": result["source_files"],
-        })
-
-        st.markdown(f'<div class="msg-assistant">🤖 {result["answer"]}</div>', unsafe_allow_html=True)
-
-        if result["source_files"]:
-            sources_html = " ".join(
-                f'<span class="source-tag">📄 {f}</span>' for f in result["source_files"]
-            )
-            st.markdown(f"**Sources:** {sources_html}", unsafe_allow_html=True)
-
         st.rerun()
+
+# Processing the latest user message if streaming was just triggered
+if st.session_state.get("is_streaming") and st.session_state.messages:
+    last_msg = st.session_state.messages[-1]
+    if last_msg["role"] == "user":
+        query = last_msg["content"]
+        
+        try:
+            with st.spinner("Searching codebase…"):
+                chunks = retrieve_relevant_chunks(query, top_k=5)
+
+            # 2. Create placeholder for streaming response
+            assistant_placeholder = st.empty()
+            
+            # 3. Generate answer with streaming
+            result = generate_answer(query, chunks, streaming_placeholder=assistant_placeholder)
+
+            # 4. Store final assistant message in history
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": result["answer"],
+                "source_files": result["source_files"],
+            })
+        except Exception as e:
+            st.error(f"⚠️ Error: {str(e)}")
+        finally:
+            st.session_state.is_streaming = False
+            st.rerun()
