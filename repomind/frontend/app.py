@@ -106,43 +106,74 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-    index_btn = st.button("⚡ Index Repository", use_container_width=True, type="primary")
+    # Check for active background task
+    from ingestion import task_manager
+    active_task = None
+    if st.session_state.indexed_repo:
+        active_task = task_manager.get_task(st.session_state.indexed_repo)
+    
+    is_running = active_task and active_task["status"] == "running"
+
+    index_btn = st.button(
+        "⚡ Index Repository", 
+        use_container_width=True, 
+        type="primary",
+        disabled=is_running
+    )
 
     if index_btn:
         if not repo_url.strip():
             st.error("Please enter a repository URL.")
         else:
-            with st.spinner("Cloning repository…"):
-                try:
-                    dest = os.path.join(tempfile.gettempdir(), "repomind_repos",
-                                        repo_url.rstrip("/").split("/")[-1])
-                    repo_path = clone_repo(repo_url.strip(), dest)
-                    st.session_state.indexed_repo = repo_url.strip()
-                except Exception as e:
-                    st.error(f"Clone failed: {e}")
-                    st.stop()
-
-            with st.spinner("Chunking code files…"):
-                chunks = chunk_code_repository(repo_path)
-
-            with st.spinner(f"Generating embeddings for {len(chunks)} chunks…"):
-                vectors = generate_embeddings(chunks)
-
-            with st.spinner("Storing vectors in Endee…"):
-                try:
-                    count = store_embeddings(vectors)
-                    st.session_state.chunk_count = count
-                    st.success(f"✅ Indexed **{count}** chunks successfully!")
-                    # Reset chat on new repo
-                    st.session_state.messages = []
-                except Exception as e:
-                    st.error(f"Vector store error: {e}")
+            from ingestion import task_manager
+            st.session_state.indexed_repo = repo_url.strip()
+            
+            # Submit to background task queue (Phase 4)
+            task_manager.submit_task(st.session_state.indexed_repo)
+            st.rerun()
 
     st.divider()
 
     if st.session_state.indexed_repo:
         st.markdown(f"**Active repo:**")
         st.code(st.session_state.indexed_repo.split("/")[-1], language=None)
+        
+        # Display background task dashboard
+        task = task_manager.get_task(st.session_state.indexed_repo)
+        if task:
+            # 1. Status Badge
+            if task["status"] == "running":
+                st.info("🔵 Indexing in progress...")
+            elif task["status"] == "completed":
+                st.success("✅ Indexing completed!")
+            elif task["status"] == "failed":
+                st.error("❌ Indexing failed")
+            
+            # 2. Progress Bar
+            st.progress(task["progress"] / 100.0)
+            
+            # 3. Current Step & Percentage
+            col_msg, col_pct = st.columns([3, 1])
+            with col_msg:
+                st.caption(f"Step: {task['message']}")
+            with col_pct:
+                st.caption(f"{task['progress']}%")
+            
+            # 4. Activity Log (Recent steps)
+            if task["logs"]:
+                with st.expander("📄 Activity Log", expanded=task["status"] == "running"):
+                    for log_msg in reversed(task["logs"][-10:]): # Show last 10 logs
+                        st.markdown(f"<p style='font-size: 0.8rem; margin: 0;'>{log_msg}</p>", unsafe_allow_html=True)
+            
+            if task["error"]:
+                st.error(f"Error Details: {task['error']}")
+            
+            # 5. Auto-refresh if running
+            if task["status"] == "running":
+                import time
+                time.sleep(1)
+                st.rerun()
+        
         st.caption(f"{st.session_state.chunk_count:,} chunks indexed")
     else:
         st.caption("No repository indexed yet.")

@@ -4,6 +4,8 @@ import logging
 from typing import List, Dict, Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 
+from ingestion import file_tracker
+
 logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {
@@ -32,14 +34,16 @@ def get_text_splitter_for_ext(ext: str, chunk_size: int = 400, chunk_overlap: in
         chunk_overlap=chunk_overlap,
     )
 
-def chunk_code_repository(repo_path: str, chunk_size: int = 400, chunk_overlap: int = 50) -> List[Dict[str, Any]]:
+def chunk_code_repository(repo_path: str, repo_id: str = None, chunk_size: int = 400, chunk_overlap: int = 50, include_files: List[str] = None) -> List[Dict[str, Any]]:
     """
     Reads all supported code files from a directory and splits them into chunks.
     
     Args:
         repo_path (str): The root directory to scan for code files.
+        repo_id (str, optional): The repository ID for delta tracking.
         chunk_size (int): Approximate target size per chunk.
         chunk_overlap (int): Number of characters to overlap between chunks.
+        include_files (List[str], optional): specific relative paths to process.
         
     Returns:
         List[Dict[str, Any]]: A list of chunk dictionaries containing content and metadata.
@@ -64,6 +68,10 @@ def chunk_code_repository(repo_path: str, chunk_size: int = 400, chunk_overlap: 
             # Make path relative to repo root for cleaner metadata
             rel_path = os.path.relpath(file_path, repo_path)
             
+            # If include_files is provided, skip if not in the list
+            if include_files is not None and rel_path not in include_files:
+                continue
+            
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
@@ -74,11 +82,13 @@ def chunk_code_repository(repo_path: str, chunk_size: int = 400, chunk_overlap: 
                 splitter = get_text_splitter_for_ext(ext.lower(), chunk_size, chunk_overlap)
                 file_chunks = splitter.create_documents([content])
                 
-                for doc in file_chunks:
+                total_chunks = len(file_chunks)
+                for i, doc in enumerate(file_chunks):
                     chunks.append({
                         "content": doc.page_content,
                         "file_path": rel_path,
-                        "chunk_id": str(uuid.uuid4())
+                        "chunk_index": i,
+                        "total_chunks": total_chunks
                     })
                     
             except UnicodeDecodeError:

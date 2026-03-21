@@ -66,13 +66,16 @@ def _get_index():
     return _index
 
 
-def store_embeddings(vectors: List[Dict[str, Any]], batch_size: int = 500) -> int:
+from rag import vector_mapper
+
+def store_embeddings(repo_id: str, vectors: List[Dict[str, Any]], batch_size: int = 500) -> int:
     """
     Upserts a list of embedding vectors with metadata into the Endee index in batches.
 
     Args:
+        repo_id (str): The repository ID for metadata mapping.
         vectors (List[Dict[str, Any]]): Output from `generate_embeddings()`.
-            Each item must contain 'chunk_id', 'embedding', 'file_path', and 'content'.
+            Each item must contain 'embedding', 'file_path', 'content', 'chunk_index', and 'total_chunks'.
         batch_size (int): Max number of vectors to send in a single batch. Endee limit is 1000.
 
     Returns:
@@ -84,18 +87,17 @@ def store_embeddings(vectors: List[Dict[str, Any]], batch_size: int = 500) -> in
 
     index = _get_index()
 
-    items = [
-        {
-            "id": v["chunk_id"],
-            "vector": v["embedding"],
-            "meta": {
-                "file_path": v["file_path"],
-                "chunk_id": v["chunk_id"],
-                "content": v["content"],
-            },
-        }
-        for v in vectors
-    ]
+    items = []
+    for v in vectors:
+        meta = vector_mapper.generate_chunk_metadata(
+            repo_id=repo_id,
+            file_path=v["file_path"],
+            chunk_index=v["chunk_index"],
+            total_chunks=v["total_chunks"],
+            content=v["content"]
+        )
+        chunk_id = vector_mapper.generate_chunk_id(v["file_path"], v["chunk_index"])
+        items.append(vector_mapper.build_vector_payload(chunk_id, v["embedding"], meta))
 
     total_stored = 0
     logger.info(f"Storing {len(items)} vectors in batches of {batch_size}...")
@@ -148,3 +150,35 @@ def search_similar(
 
     logger.info(f"Found {len(results)} results.")
     return results
+
+
+def delete_vectors_by_file(repo_id: str, file_path: str) -> int:
+    """
+    Deletes all vectors associated with a specific file in a repository.
+    """
+    index = _get_index()
+    
+    # Endee supports metadata filtering in queries. 
+    # We query for IDs first, then delete.
+    logger.info(f"Deleting vectors for file '{file_path}' in repo '{repo_id}'...")
+    
+    # This assumes the Endee Python SDK query can take a filter or we just query enough top_k
+    # For now, we query with a high top_k to find all chunks of the file.
+    # In a real scenario, we'd use a filter if supported by the SDK.
+    raw_results = index.query(vector=[0]*EMBEDDING_DIMENSION, top_k=1000) # Dummy vector since we want metadata matches
+    
+    ids_to_delete = []
+    for item in raw_results:
+        meta = item.get("meta", {}) if isinstance(item, dict) else getattr(item, "meta", {})
+        if meta.get("file_path") == file_path:
+             item_id = item.get("id") if isinstance(item, dict) else getattr(item, "id", None)
+             if item_id:
+                 ids_to_delete.append(item_id)
+                 
+    if ids_to_delete:
+        index.delete(ids=ids_to_delete)
+        logger.info(f"Deleted {len(ids_to_delete)} vectors for {file_path}")
+        return len(ids_to_delete)
+    
+    logger.info(f"No vectors found for {file_path}")
+    return 0
