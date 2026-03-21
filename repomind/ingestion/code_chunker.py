@@ -84,9 +84,12 @@ def chunk_code_repository(repo_path: str, repo_id: str = None, chunk_size: int =
                 
                 total_chunks = len(file_chunks)
                 for i, doc in enumerate(file_chunks):
+                    # Deterministic Chunk ID (Phase 4 requirement)
+                    chunk_id = f"{rel_path}::chunk_{i}"
                     chunks.append({
                         "content": doc.page_content,
                         "file_path": rel_path,
+                        "chunk_id": chunk_id,
                         "chunk_index": i,
                         "total_chunks": total_chunks
                     })
