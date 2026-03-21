@@ -15,9 +15,20 @@ from rag.vector_store import store_embeddings
 from rag.retriever import retrieve_relevant_chunks
 from rag.generator import generate_answer
 
-logging.basicConfig(level=logging.WARNING)
+# ── Configuration Helpers ────────────────────────────────────────────────────
+def get_config(key, default=None):
+    """Retrieve configuration from st.secrets or environment variables."""
+    # 1. Try Streamlit Secrets (for Cloud)
+    if key in st.secrets:
+        return st.secrets[key]
+    # 2. Try Environment Variables (for Local/Docker)
+    return os.getenv(key, default)
 
-# ── Page config ──────────────────────────────────────────────────────────────
+GROQ_API_KEY = get_config("GROQ_API_KEY")
+OPENAI_API_KEY = get_config("OPENAI_API_KEY")
+ENDEE_BASE_URL = get_config("ENDEE_BASE_URL", "http://localhost:8080/api/v1")
+LLM_PROVIDER = get_config("LLM_PROVIDER", "groq")
+LLM_MODEL = get_config("LLM_MODEL", "llama-3.3-70b-versatile")
 st.set_page_config(
     page_title="RepoMind — Chat with your Codebase",
     page_icon="🧠",
@@ -235,8 +246,17 @@ if st.session_state.get("is_streaming") and st.session_state.messages:
             # 2. Create placeholder for streaming response
             assistant_placeholder = st.empty()
             
-            # 3. Generate answer with streaming
-            result = generate_answer(query, chunks, streaming_placeholder=assistant_placeholder)
+            # 3. Generate answer with streaming (pass resolved config)
+            api_key = GROQ_API_KEY if LLM_PROVIDER == "groq" else OPENAI_API_KEY
+            
+            result = generate_answer(
+                query, 
+                chunks, 
+                streaming_placeholder=assistant_placeholder,
+                api_key=api_key,
+                provider=LLM_PROVIDER,
+                model_name=LLM_MODEL
+            )
 
             # 4. Store final assistant message in history
             st.session_state.messages.append({

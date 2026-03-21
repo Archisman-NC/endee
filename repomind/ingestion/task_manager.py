@@ -105,21 +105,36 @@ def list_tasks() -> Dict[str, Dict[str, Any]]:
 # ── Celery Submission (Phase 5) ─────────────────────────────────────────────
 
 def submit_task(repo_url: str):
-    """Submits a new indexing task to Celery (Phase 5)."""
+    """Submits a new indexing task, falling back to local threads if Celery/Redis is unavailable."""
     repo_id = repo_url.strip()
     
-    # Lazy import
-    from ingestion.tasks import run_indexing_task
+    # Check if we should use Celery
+    use_celery = _redis_client is not None
     
-    # 1. Submit to Celery
-    result = run_indexing_task.delay(repo_id)
+    if use_celery:
+        try:
+            # Lazy import
+            from ingestion.tasks import run_indexing_task
+            result = run_indexing_task.delay(repo_id)
+            _redis_client.set(f"task_id:{repo_id}", result.id)
+            with _task_lock:
+                _tasks[repo_id] = {"status": "pending", "progress": 0, "message": "Queued in Celery...", "logs": ["⏳ Submitted to Celery worker."], "error": None}
+            logger.info(f"[RepoMind] Task submitted to Celery: {result.id}")
+            return
+        except Exception as e:
+            logger.warning(f"[RepoMind] Celery submission failed, falling back to thread: {e}")
+
+    # Fallback: Local Threading (Phase 1 logic)
+    from ingestion.pipeline import run_indexing_pipeline
     
-    # 2. Store mapping in Redis for persistence
-    if _redis_client:
-        _redis_client.set(f"task_id:{repo_id}", result.id)
-    
-    # 3. For local session continuity
-    with _task_lock:
-        _tasks[repo_id] = {"status": "pending", "progress": 0, "message": "Queued in Celery...", "logs": ["⏳ Submitted to Celery."], "error": None}
-    
-    logger.info(f"[RepoMind] Task submitted to Celery: {result.id} for {repo_id}")
+    def local_worker():
+        try:
+            update_task(repo_id, status="running", progress=0, message="Starting local indexing...")
+            run_indexing_pipeline(repo_id)
+        except Exception as e:
+            update_task(repo_id, status="failed", error=str(e))
+
+    init_task(repo_id)
+    thread = Thread(target=local_worker, daemon=True)
+    thread.start()
+    logger.info(f"[RepoMind] Task started in local thread for {repo_id}")

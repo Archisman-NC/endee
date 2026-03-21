@@ -38,19 +38,14 @@ def _build_prompt(query: str, retrieved_chunks: List[Dict[str, Any]]) -> str:
 def generate_answer(
     query: str,
     retrieved_chunks: List[Dict[str, Any]],
-    streaming_placeholder=None
+    streaming_placeholder=None,
+    api_key: str = None,
+    provider: str = "groq",
+    model_name: str = "llama-3.3-70b-versatile"
 ) -> Dict[str, Any]:
     """
     Generates a natural language explanation for a query using an LLM and retrieved code context.
     Supports real-time token streaming to an optional Streamlit placeholder.
-
-    Args:
-        query (str): The natural language question about the codebase.
-        retrieved_chunks (List[Dict[str, Any]]): Code chunks from the retriever.
-        streaming_placeholder (st.empty, optional): Placeholder for live streaming.
-
-    Returns:
-        Dict[str, Any]: Generated answer and metadata.
     """
     if not query or not query.strip():
         return {"answer": "Please provide a valid query.", "source_files": [], "query": query}
@@ -63,25 +58,23 @@ def generate_answer(
     # Build the prompt
     user_prompt = _build_prompt(query, retrieved_chunks)
 
-    # Initialize LLM via LangChain (model configured via env var)
     from rag.stream_handler import StreamHandler
     stream_handler = StreamHandler(streaming_placeholder)
 
-    try:
-        import streamlit as st
-        model_name = st.secrets.get("LLM_MODEL", os.getenv("LLM_MODEL", "gpt-4o-mini"))
-        provider = st.secrets.get("LLM_PROVIDER", os.getenv("LLM_PROVIDER", "openai"))
-    except Exception:
-        model_name = os.getenv("LLM_MODEL", "gpt-4o-mini")
-        provider = os.getenv("LLM_PROVIDER", "openai")
+    if not api_key:
+        err_msg = f"API Key for {provider} is missing."
+        if streaming_placeholder:
+            streaming_placeholder.error(f"⚠️ {err_msg}")
+        return {"answer": err_msg, "source_files": source_files, "query": query}
 
-    logger.info(f"Calling LLM ({provider}/{model_name}) for query: '{query}' [Streaming=True]")
-    print("[RepoMind] Streaming started...")
+    logger.info(f"Calling LLM ({provider}/{model_name}) [Streaming=True]")
+    print(f"[RepoMind] Streaming with {provider}...")
 
     try:
         llm = init_chat_model(
             model_name, 
-            model_provider=provider, 
+            model_provider=provider,
+            api_key=api_key,
             streaming=True, 
             callbacks=[stream_handler]
         )
