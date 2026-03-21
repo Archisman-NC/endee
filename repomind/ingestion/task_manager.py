@@ -6,9 +6,14 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
+import os
+
 # Redis Connection for task mapping (Phase 5)
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", "6379"))
+
 try:
-    _redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+    _redis_client = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)
 except Exception as e:
     logger.error(f"[RepoMind] Could not connect to Redis: {e}")
     _redis_client = None

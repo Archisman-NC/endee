@@ -1,35 +1,54 @@
 services:
+  # 1. Vector Database (Endee)
   endee-oss:
-    image: endee-oss:latest
+    image: endeeio/endee-server:latest
     container_name: endee-oss
     ports:
       - "8080:8080"
     ulimits:
       nofile: 100000
-# ----------------------------------------------------
-# Logging Configuration Block
-    logging:
-      driver: "json-file" # Explicitly use the default driver
-      options:
-        # Set the max size of a single log file to 200 megabytes
-        # Docker rotates the log file when it hits this limit
-        max-size: "200m"
-        # Set the maximum number of log files to keep
-        # (200m * 5 files = 1000m or 1 GB total log space)
-        max-file: "5"
-# ----------------------------------------------------
-    environment:
-      NDD_NUM_THREADS: 0
-      NDD_AUTH_TOKEN: "" # Replace with your auth token
     volumes:
       - endee-data:/data
     restart: unless-stopped
 
+  # 2. Redis (Queue Broker)
+  redis:
+    image: redis:latest
+    container_name: redis-queue
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # 3. Streamlit Frontend
+  repomind-app:
+    build: .
+    container_name: repomind-app
+    ports:
+      - "8501:8501"
+    environment:
+      - ENDEE_BASE_URL=http://endee-oss:8080/api/v1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_HOST=redis
+    depends_on:
+      - endee-oss
+      - redis
+    restart: unless-stopped
+
+  # 4. Celery Worker (Background Indexing)
+  repomind-worker:
+    build: .
+    container_name: repomind-worker
+    command: celery -A repomind.celery_app worker --loglevel=info
+    environment:
+      - ENDEE_BASE_URL=http://endee-oss:8080/api/v1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_HOST=redis
+    depends_on:
+      - endee-oss
+      - redis
+    restart: unless-stopped
+
 volumes:
-  # Modify the 'device' path below to change the host directory used for data persistence
   endee-data:
-    # driver: local
-    # driver_opts:
-    # type: ext4
-    # o: bind
-    # device: ${PWD}/dockerdata

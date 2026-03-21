@@ -9,3 +9,5 @@ langchain-groq
 GitPython
 python-dotenv
 endee
+celery[redis]
+redis
