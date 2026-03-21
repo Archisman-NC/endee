@@ -68,25 +68,25 @@ def get_task(repo_id: str) -> Optional[Dict[str, Any]]:
                 from celery.result import AsyncResult
                 from celery_app import celery_app
                 res = AsyncResult(task_id, app=celery_app)
-            
-            # Construct task state from Celery/Redis
-            state = {
-                "status": res.state.lower(),
-                "progress": 0,
-                "message": "",
-                "logs": [],
-                "error": None
-            }
-            
-            if res.info and isinstance(res.info, dict):
-                state["progress"] = res.info.get("progress", 0)
-                state["message"] = res.info.get("message", "")
-                state["logs"] = res.info.get("logs", []) # Full list from Phase 5
-                if res.info.get("error"):
-                    state["error"] = res.info.get("error")
-            elif isinstance(res.info, Exception):
-                state["error"] = str(res.info)
-            
+                
+                # Construct task state from Celery/Redis
+                state = {
+                    "status": res.state.lower(),
+                    "progress": 0,
+                    "message": "",
+                    "logs": [],
+                    "error": None
+                }
+                
+                if res.info and isinstance(res.info, dict):
+                    state["progress"] = res.info.get("progress", 0)
+                    state["message"] = res.info.get("message", "")
+                    state["logs"] = res.info.get("logs", [])
+                    if res.info.get("error"):
+                        state["error"] = res.info.get("error")
+                elif isinstance(res.info, Exception):
+                    state["error"] = str(res.info)
+                
                 if res.state == "SUCCESS":
                     state["status"] = "completed"
                     state["progress"] = 100
