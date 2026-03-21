@@ -125,7 +125,7 @@ with st.sidebar:
     if st.session_state.indexed_repo:
         active_task = task_manager.get_task(st.session_state.indexed_repo)
     
-    is_running = active_task and active_task["status"] == "running"
+    is_running = bool(active_task and active_task["status"] == "running")
 
     index_btn = st.button(
         "⚡ Index Repository", 
